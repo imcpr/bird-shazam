@@ -101,8 +101,8 @@ def write_submission(filename, preds):
             fname+="0"
         fname += "%d.wav_classnumber_" %i
         for j in range(1, 88):
-            filename = fname + "%d" % j
-            line = "%s,%f"%(filename,preds[i-1][j-1])
+            fullname = fname + "%d" % j
+            line = "%s,%f"%(fullname,preds[i-1][j-1])
             f.write(line+"\n")
     f.close()
 
