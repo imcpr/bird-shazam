@@ -32,7 +32,7 @@ def load_test_files():
 
 
 # returns a list of size 687 with each position holding the matrix from file i
-def load_files():
+def load_train_files():
     files = {}
     for i in range(1, 688):
         fname = "../data/train/cepst_conc_cepst_nips4b_birds_trainfile"
@@ -66,7 +66,7 @@ def load_labels():
 def vector_mean(m):
     return np.sum(m, axis=1)/1288
 
-def create_dataset(files, labels):
+def create_lgr_dataset(files, labels):
     X = []
     Y = []
     c = 0
@@ -80,6 +80,7 @@ def create_dataset(files, labels):
                 c += 1
     return np.array(X), np.array(Y)
 
+# takes the 17x1288 matrix and averages out column vectors to get 1x17 avg vector
 def transform_X(files, start, end, skip=True):
     X = []
     for i in range(start, end):
@@ -88,16 +89,35 @@ def transform_X(files, start, end, skip=True):
         X.append(np.sum(files[i], axis=1)/1288)
     return np.array(X)
 
+def write_submission(filename, preds):
+    f = open(filename, 'w')
+    for i in range(1,1001):
+        fname = "nips4b_birds_testfile"
+        if i < 10:
+            fname+= "000"
+        elif i<100:
+            fname+="00"
+        elif i<1000:
+            fname+="0"
+        fname += "%d.wav_classnumber_" %i
+        for j in range(1, 88):
+            filename = fname + "%d" % j
+            line = "%s,%f"%(filename,preds[i-1][j-1])
+            f.write(line+"\n")
+    f.close()
+
 print "Loading dataset"
-files = load_files()
+files = load_train_files()
 labels = load_labels()
 print "Formatting data"
-X, Y = create_dataset(files, labels)
+# formats dataset in lgr format
+lgrX, lgrY = create_lgr_dataset(files, labels)
 
 lgr = LogisticRegression()
 print "Fitting LogisticRegression Classifier"
-lgr = lgr.fit(X, Y)
+lgr = lgr.fit(lgrX, lgrY)
 
+# formats data for decision tree format
 X_train = transform_X(files, 1, 500)
 Y_train = []
 for i in range(1, 500):
@@ -108,52 +128,30 @@ Y_train = np.array(Y_train)
 dt = DecisionTreeClassifier()
 dt = dt.fit(X_train, Y_train)
 
-X_test = transform_X(files, 500, 688)
-Y_test = []
+# transform validation set
+X_val = transform_X(files, 500, 688)
+Y_val = []
 for i in range(500, 688):
     Y_test.append(labels[i])
-Y_test = np.array(Y_test)
-preds = lgr.predict_proba(X_test)
+Y_val = np.array(Y_val)
+
+preds = lgr.predict_proba(X_val)
 
 print "LogisticRegression on test: "
-print "AUC %f " % metrics.roc_auc_score(Y_test, preds)
+print "ROC AUC %f " % metrics.roc_auc_score(Y_val, preds)
 
 preds2= dt.predict(X_test)
 
 print "DecisionTreeClassifier on test: "
-print "AUC %f " % metrics.roc_auc_score(Y_test, preds2)
+print "ROC AUC %f " % metrics.roc_auc_score(Y_val, preds2)
 
+
+# read actual test files and transform into correct format
 test_files = load_test_files()
 X_sub = transform_X(test_files, 1, 1001, False)
 preds = lgr.predict_proba(X_sub)
 preds2 = dt.predict(X_sub)
 
-f = open('lgr_sub', 'w')
-for i in range(1,1001):
-    fname = "nips4b_birds_testfile"
-    if i < 10:
-        fname+= "000"
-    elif i<100:
-        fname+="00"
-    elif i<1000:
-        fname+="0"
-    fname += "%d.wav_classnumber_" %i
-    for j in range(1, 88):
-        filename = fname + "%d" % j
-        line = "%s,%f"%(filename,preds[i-1][j-1])
-        f.write(line+"\n")
-
-f2 = open('dt_sub', 'w')
-for i in range(1,1001):
-    fname = "nips4b_birds_testfile"
-    if i < 10:
-        fname+= "000"
-    elif i<100:
-        fname+="00"
-    elif i<1000:
-        fname+="0"
-    fname += "%d.wav_classnumber_" %i
-    for j in range(1, 88):
-        filename = fname + "%d" % j
-        line = "%s,%f"%(filename,preds2[i-1][j-1])
-        f2.write(line+"\n")
+# write to files
+# write_submission('lgr_sub', preds)
+# write_submission('dt_sub', preds2)
